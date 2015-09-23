@@ -24,6 +24,10 @@ while test $# -gt 0; do
             NEWEXTENSION="$2"
             shift
         ;;
+        --outdir)
+            OUTDIR="$2"
+            shift
+        ;;
         *)
             echo "Unknown parameter $1"
             echo 'Usage: repack --oldfile $OLDFILE --newname $NEWNAME --newextension $NEWEXTENSION'
@@ -48,6 +52,11 @@ if [ -z "$NEWEXTENSION" ]; then
     exit 1
 fi
 
+if [ -z "$OUTDIR" ]; then
+    echo "ERROR: no output directory given via the --outdir parameter"
+    exit 1
+fi
+
 if [ ! -f "$OLDFILE" ]; then
     echo "ERROR: Unknown file $OLDFILE"
     exit 1
@@ -57,6 +66,6 @@ TEMPDIR=$(mktemp -d)
 mkdir "$TEMPDIR/$NEWNAME"
 
 tar -C "$TEMPDIR/$NEWNAME" --strip-components=1 -xf "./$OLDFILE"
-tar -C "$TEMPDIR" -cf "$NEWNAME.$NEWEXTENSION" "$NEWNAME"
+tar -C "$TEMPDIR" -cf "$OUTDIR/$NEWNAME.$NEWEXTENSION" "$NEWNAME"
 
 rm -r "$TEMPDIR"
