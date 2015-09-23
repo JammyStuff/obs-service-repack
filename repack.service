@@ -1,0 +1,16 @@
+<service name="repack">
+    <summary>Repack a tarball under a different name</summary>
+    <description>This service takes a tarball with the given name and repacks it to a new name, including changing the name of the base directory.</description>
+    <parameter name="oldfile">
+        <description>The name of the input tarball, including extension (can be a glob)</description>
+        <required/>
+    </parameter>
+    <parameter name="newname">
+        <description>The name of the output tarball</description>
+        <required/>
+    </parameter>
+    <parameter name="newextension">
+        <description>The extension of the output tarball</description>
+        <required/>
+    </parameter>
+</service>

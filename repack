@@ -1,0 +1,62 @@
+#!/bin/bash
+
+# Script to repack a given tarball as an OBS source service
+#
+# (C) 2015 by James Wheatley <jwheatle@brocade.com>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
+
+while test $# -gt 0; do
+    case $1 in
+        --oldfile)
+            OLDFILE="${2##*/}"
+            shift
+        ;;
+        --newname)
+            NEWNAME="$2"
+            shift
+        ;;
+        --newextension)
+            NEWEXTENSION="$2"
+            shift
+        ;;
+        *)
+            echo "Unknown parameter $1"
+            echo 'Usage: repack --oldfile $OLDFILE --newname $NEWNAME --newextension $NEWEXTENSION'
+            exit 1
+        ;;
+    esac
+    shift
+done
+
+if [ -z "$OLDFILE" ]; then
+    echo "ERROR: no input file given via the --oldfile parameter"
+    exit 1
+fi
+
+if [ -z "$NEWNAME" ]; then
+    echo "ERROR: no output file name given via the --newname parameter"
+    exit 1
+fi
+
+if [ -z "$NEWEXTENSION" ]; then
+    echo "ERROR: no output file extension given via the --newextension parameter"
+    exit 1
+fi
+
+if [ ! -f "$OLDFILE" ]; then
+    echo "ERROR: Unknown file $OLDFILE"
+    exit 1
+fi
+
+TEMPDIR=$(mktemp -d)
+mkdir "$TEMPDIR/$NEWNAME"
+
+tar -C "$TEMPDIR/$NEWNAME" --strip-components=1 -xf "./$OLDFILE"
+tar -C "$TEMPDIR" -cf "$NEWNAME.$NEWEXTENSION" "$NEWNAME"
+
+rm -r "$TEMPDIR"
