@@ -57,6 +57,14 @@ if [ -z "$OUTDIR" ]; then
     exit 1
 fi
 
+# Allow file glob
+OLDFILE=$( ls -1 $OLDFILE )
+
+if [ $( echo $OLDFILE | wc -w ) -gt 1 ]; then
+   echo "ERROR: More then one file found with file globbinig for oldfile."
+   exit 1
+fi
+
 if [ ! -f "$OLDFILE" ]; then
     echo "ERROR: Unknown file $OLDFILE"
     exit 1
