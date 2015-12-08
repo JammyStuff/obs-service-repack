@@ -74,6 +74,10 @@ TEMPDIR=$(mktemp -d)
 mkdir "$TEMPDIR/$NEWNAME"
 
 tar -C "$TEMPDIR/$NEWNAME" --strip-components=1 -xf "./$OLDFILE"
+if [ -f "$TEMPDIR/$NEWNAME/config/package-lists/$NEWNAME" ] ; then
+    mv "$TEMPDIR/$NEWNAME/config/package-lists/$NEWNAME" \
+	"$TEMPDIR/$NEWNAME/config/package-lists/$NEWNAME.list.chroot"
+fi
 tar -C "$TEMPDIR" -cf "$OUTDIR/$NEWNAME.$NEWEXTENSION" "$NEWNAME"
 
 rm -r "$TEMPDIR"
