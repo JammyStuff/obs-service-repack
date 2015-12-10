@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/perl
 
 # Script to repack a given tarball as an OBS source service
 #
@@ -10,84 +10,103 @@
 # of the License, or (at your option) any later version.
 # See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
 
-declare -a PKG_LISTS
+use strict;
+use warnings;
 
-while test $# -gt 0; do
-    case $1 in
-        --oldfile)
-            OLDFILE="${2##*/}"
-            shift
-        ;;
-        --newname)
-            NEWNAME="$2"
-            shift
-        ;;
-        --newextension)
-            NEWEXTENSION="$2"
-            shift
-        ;;
-        --with)
-            PKG_LISTS=("${PKG_LISTS[@]}" "$2")
-            shift
-        ;;
-        --outdir)
-            OUTDIR="$2"
-            shift
-        ;;
-        *)
-            echo "Unknown parameter $1"
-            echo 'Usage: repack --oldfile $OLDFILE --newname $NEWNAME --newextension $NEWEXTENSION'
-            exit 1
-        ;;
-    esac
-    shift
-done
+use File::Temp qw/ tempdir /;
+use File::Path qw(make_path);
 
-PKG_LISTS=("${PKG_LISTS[@]}" "$NEWNAME")
+sub usage()
+{
+    my $text = <<'END';
+Usage: repack --oldfile $OLDFILE --newname $NEWNAME --newextension $NEWEXTENSION
+END
+    print $text;
+    exit;
+}
 
-if [ -z "$OLDFILE" ]; then
-    echo "ERROR: no input file given via the --oldfile parameter"
-    exit 1
-fi
+# http://docstore.mik.ua/orelly/perl/cookbook/ch06_10.htm
+sub glob2pat {
+    my $globstr = shift;
+    my %patmap = (
+        '*' => '.*',
+        '?' => '.',
+        '[' => '[',
+        ']' => ']',
+    );
+    $globstr =~ s{(.)} { $patmap{$1} || "\Q$1" }ge;
+    return '^' . $globstr . '$';
+}
 
-if [ -z "$NEWNAME" ]; then
-    echo "ERROR: no output file name given via the --newname parameter"
-    exit 1
-fi
+my %opt = ();
 
-if [ -z "$NEWEXTENSION" ]; then
-    echo "ERROR: no output file extension given via the --newextension parameter"
-    exit 1
-fi
+while (@ARGV) {
+    usage() if $ARGV[0] eq '--help';
+    if ($ARGV[0] eq '--outdir') {
+        shift @ARGV;
+        $opt{outdir} = shift @ARGV;
+        next;
+    } elsif ($ARGV[0] eq '--oldfile') {
+        shift @ARGV;
+        $opt{oldfile} = shift @ARGV;
+        next;
+    } elsif ($ARGV[0] eq '--newname') {
+        shift @ARGV;
+        $opt{newname} = shift @ARGV;
+        next;
+    } elsif ($ARGV[0] eq '--newextension') {
+        shift @ARGV;
+        $opt{newextension} = shift @ARGV;
+        next;
+    } elsif ($ARGV[0] eq '--with') {
+        shift @ARGV;
+        push @{$opt{with}}, shift @ARGV;
+        next;
+    } else {
+        die("Unknown argument $ARGV[0]!");
+    }
+    last;
+}
 
-if [ -z "$OUTDIR" ]; then
-    echo "ERROR: no output directory given via the --outdir parameter"
-    exit 1
-fi
+usage() unless $opt{outdir} && $opt{oldfile} && $opt{newname}
+    && $opt{newextension};
 
-# Allow file glob
-OLDFILE=$( ls -1 $OLDFILE )
 
-if [ $( echo $OLDFILE | wc -w ) -gt 1 ]; then
-   echo "ERROR: More then one file found with file globbinig for oldfile."
-   exit 1
-fi
+# get local file list
+local *D;
+opendir(D, ".") || return ();
+my @srcfiles = map { $_ =~ s/^_service:.*://; $_ } grep {
+    $_ ne '.' && $_ ne '..' && $_ !~ '^_service:repack:*'
+} readdir(D);
+closedir D;
 
-if [ ! -f "$OLDFILE" ]; then
-    echo "ERROR: Unknown file $OLDFILE"
-    exit 1
-fi
+my $infiles_pattern = glob2pat($opt{oldfile});
+my @infiles = grep { /$infiles_pattern/ } @srcfiles;
 
-TEMPDIR=$(mktemp -d)
-mkdir "$TEMPDIR/$NEWNAME"
+if ( $#infiles gt 1) {
+    print STDERR "ERROR: More then one file found with file globbinig for oldfile.\n";
+    exit 1;
+}
 
-tar -C "$TEMPDIR/$NEWNAME" --strip-components=1 -xf "./$OLDFILE"
-for PKG_LIST in "${PKG_LISTS[@]}"; do
-    if [ -f "$TEMPDIR/$NEWNAME/config/package-lists/$PKG_LIST" ] ; then
-        mv "$TEMPDIR/$NEWNAME/config/package-lists/$PKG_LIST" \
-	   "$TEMPDIR/$NEWNAME/config/package-lists/$PKG_LIST.list.chroot"
-    fi
-done
-tar -C "$TEMPDIR" -cf "$OUTDIR/$NEWNAME.$NEWEXTENSION" "$NEWNAME"
+my $tmpdir = tempdir( CLEANUP =>  1 );
+my $newdir = join('/', $tmpdir, $opt{newname});
+make_path($newdir);
 
-rm -r "$TEMPDIR"
+# strip first component if there is just one toplevel directory
+my @tar_contents = grep { /^[^\/]+\/?$/ } qx(tar -tf $infiles[0]);
+my $tar_xf_args = "";
+$tar_xf_args = "--strip-components=1" unless $#tar_contents gt 1;
+
+system("tar -C $newdir $tar_xf_args -xf $infiles[0]");
+
+# enable package-lists based on names passed via --newname and --with
+push @{$opt{with}}, $opt{newname};
+foreach my $file (@{$opt{with}}) {
+    $file = join('/', "$newdir/config/package-lists", $file);
+    next if ! -e "$file";
+
+    print STDOUT "Enabling $file\n";
+    rename($file, "$file.list.chroot");
+}
+
+system("tar -C $tmpdir -cf $opt{outdir}/$opt{newname}.$opt{newextension} $opt{newname}");
