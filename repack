@@ -1,0 +1,112 @@
+#!/usr/bin/perl
+
+# Script to repack a given tarball as an OBS source service
+#
+# (C) 2015 by James Wheatley <jwheatle@brocade.com>
+#
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
+
+use strict;
+use warnings;
+
+use File::Temp qw/ tempdir /;
+use File::Path qw(make_path);
+
+sub usage()
+{
+    my $text = <<'END';
+Usage: repack --oldfile $OLDFILE --newname $NEWNAME --newextension $NEWEXTENSION
+END
+    print $text;
+    exit;
+}
+
+# http://docstore.mik.ua/orelly/perl/cookbook/ch06_10.htm
+sub glob2pat {
+    my $globstr = shift;
+    my %patmap = (
+        '*' => '.*',
+        '?' => '.',
+        '[' => '[',
+        ']' => ']',
+    );
+    $globstr =~ s{(.)} { $patmap{$1} || "\Q$1" }ge;
+    return '^' . $globstr . '$';
+}
+
+my %opt = ();
+
+while (@ARGV) {
+    usage() if $ARGV[0] eq '--help';
+    if ($ARGV[0] eq '--outdir') {
+        shift @ARGV;
+        $opt{outdir} = shift @ARGV;
+        next;
+    } elsif ($ARGV[0] eq '--oldfile') {
+        shift @ARGV;
+        $opt{oldfile} = shift @ARGV;
+        next;
+    } elsif ($ARGV[0] eq '--newname') {
+        shift @ARGV;
+        $opt{newname} = shift @ARGV;
+        next;
+    } elsif ($ARGV[0] eq '--newextension') {
+        shift @ARGV;
+        $opt{newextension} = shift @ARGV;
+        next;
+    } elsif ($ARGV[0] eq '--with') {
+        shift @ARGV;
+        push @{$opt{with}}, shift @ARGV;
+        next;
+    } else {
+        die("Unknown argument $ARGV[0]!");
+    }
+    last;
+}
+
+usage() unless $opt{outdir} && $opt{oldfile} && $opt{newname}
+    && $opt{newextension};
+
+
+# get local file list
+local *D;
+opendir(D, ".") || return ();
+my @srcfiles = map { $_ =~ s/^_service:.*://; $_ } grep {
+    $_ ne '.' && $_ ne '..' && $_ !~ '^_service:repack:*'
+} readdir(D);
+closedir D;
+
+my $infiles_pattern = glob2pat($opt{oldfile});
+my @infiles = grep { /$infiles_pattern/ } @srcfiles;
+
+if ( $#infiles gt 1) {
+    print STDERR "ERROR: More then one file found with file globbinig for oldfile.\n";
+    exit 1;
+}
+
+my $tmpdir = tempdir( CLEANUP =>  1 );
+my $newdir = join('/', $tmpdir, $opt{newname});
+make_path($newdir);
+
+# strip first component if there is just one toplevel directory
+my @tar_contents = grep { /^[^\/]+\/?$/ } qx(tar -tf $infiles[0]);
+my $tar_xf_args = "";
+$tar_xf_args = "--strip-components=1" unless $#tar_contents gt 1;
+
+system("tar -C $newdir $tar_xf_args -xf $infiles[0]");
+
+# enable package-lists based on names passed via --newname and --with
+push @{$opt{with}}, $opt{newname};
+foreach my $file (@{$opt{with}}) {
+    $file = join('/', "$newdir/config/package-lists", $file);
+    next if ! -e "$file";
+
+    print STDOUT "Enabling $file\n";
+    rename($file, "$file.list.chroot");
+}
+
+system("tar -C $tmpdir -cf $opt{outdir}/$opt{newname}.$opt{newextension} $opt{newname}");
