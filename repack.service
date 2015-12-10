@@ -13,4 +13,7 @@
         <description>The extension of the output tarball</description>
         <required/>
     </parameter>
+    <parameter name="with">
+        <description>Name of package list to activate. You may use this parameter multiple times.</description>
+    </parameter>
 </service>
