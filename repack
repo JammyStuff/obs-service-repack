@@ -10,6 +10,8 @@
 # of the License, or (at your option) any later version.
 # See http://www.gnu.org/licenses/gpl-2.0.html for full license text.
 
+declare -a PKG_LISTS
+
 while test $# -gt 0; do
     case $1 in
         --oldfile)
@@ -24,6 +26,10 @@ while test $# -gt 0; do
             NEWEXTENSION="$2"
             shift
         ;;
+        --with)
+            PKG_LISTS=("${PKG_LISTS[@]}" "$2")
+            shift
+        ;;
         --outdir)
             OUTDIR="$2"
             shift
@@ -36,6 +42,8 @@ while test $# -gt 0; do
     esac
     shift
 done
+
+PKG_LISTS=("${PKG_LISTS[@]}" "$NEWNAME")
 
 if [ -z "$OLDFILE" ]; then
     echo "ERROR: no input file given via the --oldfile parameter"
@@ -74,10 +82,12 @@ TEMPDIR=$(mktemp -d)
 mkdir "$TEMPDIR/$NEWNAME"
 
 tar -C "$TEMPDIR/$NEWNAME" --strip-components=1 -xf "./$OLDFILE"
-if [ -f "$TEMPDIR/$NEWNAME/config/package-lists/$NEWNAME" ] ; then
-    mv "$TEMPDIR/$NEWNAME/config/package-lists/$NEWNAME" \
-	"$TEMPDIR/$NEWNAME/config/package-lists/$NEWNAME.list.chroot"
-fi
+for PKG_LIST in "${PKG_LISTS[@]}"; do
+    if [ -f "$TEMPDIR/$NEWNAME/config/package-lists/$PKG_LIST" ] ; then
+        mv "$TEMPDIR/$NEWNAME/config/package-lists/$PKG_LIST" \
+	   "$TEMPDIR/$NEWNAME/config/package-lists/$PKG_LIST.list.chroot"
+    fi
+done
 tar -C "$TEMPDIR" -cf "$OUTDIR/$NEWNAME.$NEWEXTENSION" "$NEWNAME"
 
 rm -r "$TEMPDIR"
