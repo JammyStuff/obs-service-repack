@@ -84,7 +84,7 @@ my $infiles_pattern = glob2pat($opt{oldfile});
 my @infiles = grep { /$infiles_pattern/ } @srcfiles;
 
 if ( $#infiles gt 1) {
-    print STDERR "ERROR: More then one file found with file globbinig for oldfile.\n";
+    print STDERR "ERROR: More than one file found with file globbing for oldfile.\n";
     exit 1;
 }
 
