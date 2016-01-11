@@ -19,7 +19,7 @@ use File::Path qw(make_path);
 sub usage()
 {
     my $text = <<'END';
-Usage: repack --oldfile $OLDFILE --newname $NEWNAME --newextension $NEWEXTENSION
+Usage: repack --outdir $OUTDIR --oldfile $OLDFILE --newname $NEWNAME --newextension $NEWEXTENSION
 END
     print $text;
     exit;
