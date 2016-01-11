@@ -16,4 +16,7 @@
     <parameter name="with">
         <description>Name of package list to activate. You may use this parameter multiple times.</description>
     </parameter>
+    <parameter name="without">
+        <description>Name of package list to deactivate. You may use this parameter multiple times.</description>
+    </parameter>
 </service>

@@ -62,6 +62,10 @@ while (@ARGV) {
         shift @ARGV;
         push @{$opt{with}}, shift @ARGV;
         next;
+    } elsif ($ARGV[0] eq '--without') {
+        shift @ARGV;
+        push @{$opt{without}}, shift @ARGV;
+        next;
     } else {
         die("Unknown argument $ARGV[0]!");
     }
@@ -107,6 +111,15 @@ foreach my $file (@{$opt{with}}) {
 
     print STDOUT "Enabling $file\n";
     rename($file, "$file.list.chroot");
+}
+
+# disable package-lists based on names passed via --without
+foreach my $file (@{$opt{without}}) {
+    my $file_with_ext = join('/', "$newdir/config/package-lists", "$file.list.chroot");
+    next if ! -e "$file_with_ext";
+
+    print STDOUT "Disabling $file_with_ext\n";
+    rename($file_with_ext, substr($file_with_ext, 0, -12)); # 12 == length(".list.chroot")
 }
 
 system("tar -C $tmpdir -cf $opt{outdir}/$opt{newname}.$opt{newextension} $opt{newname}");
