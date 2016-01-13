@@ -19,7 +19,7 @@ use File::Path qw(make_path);
 sub usage()
 {
     my $text = <<'END';
-Usage: repack --oldfile $OLDFILE --newname $NEWNAME --newextension $NEWEXTENSION
+Usage: repack --outdir $OUTDIR --oldfile $OLDFILE --newname $NEWNAME --newextension $NEWEXTENSION
 END
     print $text;
     exit;
@@ -62,6 +62,10 @@ while (@ARGV) {
         shift @ARGV;
         push @{$opt{with}}, shift @ARGV;
         next;
+    } elsif ($ARGV[0] eq '--without') {
+        shift @ARGV;
+        push @{$opt{without}}, shift @ARGV;
+        next;
     } else {
         die("Unknown argument $ARGV[0]!");
     }
@@ -84,7 +88,7 @@ my $infiles_pattern = glob2pat($opt{oldfile});
 my @infiles = grep { /$infiles_pattern/ } @srcfiles;
 
 if ( $#infiles gt 1) {
-    print STDERR "ERROR: More then one file found with file globbinig for oldfile.\n";
+    print STDERR "ERROR: More than one file found with file globbing for oldfile.\n";
     exit 1;
 }
 
@@ -107,6 +111,15 @@ foreach my $file (@{$opt{with}}) {
 
     print STDOUT "Enabling $file\n";
     rename($file, "$file.list.chroot");
+}
+
+# disable package-lists based on names passed via --without
+foreach my $file (@{$opt{without}}) {
+    my $file_with_ext = join('/', "$newdir/config/package-lists", "$file.list.chroot");
+    next if ! -e "$file_with_ext";
+
+    print STDOUT "Disabling $file_with_ext\n";
+    rename($file_with_ext, substr($file_with_ext, 0, -12)); # 12 == length(".list.chroot")
 }
 
 system("tar -C $tmpdir -cf $opt{outdir}/$opt{newname}.$opt{newextension} $opt{newname}");
