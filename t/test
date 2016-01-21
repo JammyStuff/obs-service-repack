@@ -1,0 +1,130 @@
+#!/bin/bash
+
+# Basic testing for repack script. This test script should be invoked
+# from the test directory.
+
+TMP_DIR=""
+CWD="$PWD"
+PARENTDIR="$(dirname "$CWD")"
+RESULT=1
+OLDNAME="old_livebuild_config"
+NEWNAME="new_livebuild_config"
+EXT="livebuild"
+OLDFILE="$OLDNAME.$EXT"
+NEWFILE="$NEWNAME.$EXT"
+
+TESTS=(test_basic test_with test_without test_with_and_without)
+
+FAILED=()
+
+function setup {
+  TMP_DIR=$(mktemp -d)
+  mkdir -p $TMP_DIR/$OLDNAME/config/package-lists
+  echo test-package > $TMP_DIR/$OLDNAME/config/package-lists/enabled.list.chroot
+  echo test-package > $TMP_DIR/$OLDNAME/config/package-lists/disabled
+  touch $TMP_DIR/$OLDNAME/{a..c}
+  tar -C $TMP_DIR -cf $TMP_DIR/$OLDFILE $OLDNAME
+}
+
+function cleanup {
+  rm -r $TMP_DIR
+}
+
+function contents_identical {
+  SHA1_old=$(tar -xvf $1 | sed -e "s/$OLDNAME/lb-cfg/g" | sha1sum)
+  SHA1_new=$(tar -xvf $2 | sed -e "s/$NEWNAME/lb-cfg/g" | sha1sum)
+
+  if [ "$SHA1_old" = "$SHA1_new" ];  then
+    RESULT=1
+  else
+    RESULT=0
+  fi
+}
+
+function verify_package_list_state {
+  
+  tar -xvf $TMP_DIR/$OLDFILE | sed "s/$OLDNAME/lb-cfg/g" > $TMP_DIR/old
+  tar -xvf $TMP_DIR/$NEWFILE | sed "s/$NEWNAME/lb-cfg/g" > $TMP_DIR/new
+
+  if [ "$1" -eq "1" ]; then
+    activated=$(diff -u $TMP_DIR/old $TMP_DIR/new | grep "\+*$2\.list\.chroot")
+    if [ -n "$activated" ]; then
+      RESULT=1
+    else
+      RESULT=0
+    fi
+  else
+    deactivated=$(diff -u $TMP_DIR/old $TMP_DIR/new | grep "\+*$2")
+    if [ -n "$deactivated" ]; then
+      RESULT=1
+    else
+      RESULT=0
+    fi
+  fi
+}
+
+function check_result {
+  if [ "$1" -eq "$RESULT" ];  then
+    echo "$2 : pass"
+  else
+    echo "$2 : fail (expected $1)"
+    FAILED+=("$2")
+  fi
+}
+
+function test_basic {
+  (cd $TMP_DIR && $PARENTDIR/repack --outdir $TMP_DIR --oldfile $OLDFILE --newname $NEWNAME --newextension $EXT)
+
+  contents_identical $TMP_DIR/$OLDFILE $TMP_DIR/$NEWFILE
+  check_result 1 "$test : contents should be identical"
+}
+
+function test_with {
+  (cd $TMP_DIR && $PARENTDIR/repack --outdir $TMP_DIR --oldfile $OLDFILE --newname $NEWNAME --newextension $EXT --with disabled)
+
+  contents_identical $TMP_DIR/$OLDFILE $TMP_DIR/$NEWFILE
+  check_result 0 "$test : contents_should differ"
+
+  verify_package_list_state 1 disabled
+  check_result 1 "$test : should have new active package list (disabled.list.chroot)"
+}
+
+function test_without {
+  (cd $TMP_DIR && $PARENTDIR/repack --outdir $TMP_DIR --oldfile $OLDFILE --newname $NEWNAME --newextension $EXT --without enabled)
+
+  contents_identical $TMP_DIR/$OLDFILE $TMP_DIR/$NEWFILE
+  check_result 0 "$test : contents should differ"
+
+  verify_package_list_state 0 enabled
+  check_result 1 "$test : package list (enabled) should be disabled"
+}
+
+function test_with_and_without {
+  (cd $TMP_DIR && $PARENTDIR/repack --outdir $TMP_DIR --oldfile $OLDFILE --newname $NEWNAME --newextension $EXT --with disabled --without enabled)
+clear
+
+  contents_identical $TMP_DIR/$OLDFILE $TMP_DIR/$NEWFILE
+  check_result 0 "$test : contents should differ"
+
+  verify_package_list_state 1 disabled
+  check_result 1 "$test : should have new active package list (disabled.list.chroot)"
+
+  verify_package_list_state 0 enabled
+  check_result 1 "$test : package list (enabled) should be disabled"
+}
+
+function summary {
+  if [ ${#FAILED[@]} -eq 0 ]; then
+    echo "All tests passed!"
+  else
+    echo "${#FAILED[@]} tests failed :("
+  fi
+}
+for test in ${TESTS[@]}; do
+  setup
+  $test
+  cleanup
+done
+
+summary
+

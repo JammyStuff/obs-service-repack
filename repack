@@ -79,9 +79,7 @@ usage() unless $opt{outdir} && $opt{oldfile} && $opt{newname}
 # get local file list
 local *D;
 opendir(D, ".") || return ();
-my @srcfiles = map { $_ =~ s/^_service:.*://; $_ } grep {
-    $_ ne '.' && $_ ne '..' && $_ !~ '^_service:repack:*'
-} readdir(D);
+my @srcfiles = grep { $_ ne '.' && $_ ne '..' } readdir(D);
 closedir D;
 
 my $infiles_pattern = glob2pat($opt{oldfile});
@@ -98,8 +96,8 @@ make_path($newdir);
 
 # strip first component if there is just one toplevel directory
 my @tar_contents = grep { /^[^\/]+\/?$/ } qx(tar -tf $infiles[0]);
-my $tar_xf_args = "";
-$tar_xf_args = "--strip-components=1" unless $#tar_contents gt 1;
+my $tar_xf_args = "--force-local"; # archive file is local even if it has a colon
+$tar_xf_args .= " --strip-components=1" unless $#tar_contents gt 1;
 
 system("tar -C $newdir $tar_xf_args -xf $infiles[0]");
 
