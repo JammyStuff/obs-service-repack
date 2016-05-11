@@ -19,4 +19,10 @@
     <parameter name="without">
         <description>Name of package list to deactivate. You may use this parameter multiple times.</description>
     </parameter>
+    <parameter name="variant">
+        <description>A string identifying a specific variant or edition of the operating system suitable for presentation to the user.</description>
+    </parameter>
+    <parameter name="variantid">
+        <description>A lower-case string (no spaces or other characters outside of 0–9, a–z, ".", "_" and "-"), identifying a specific variant or edition of the operating system.</description>
+    </parameter>
 </service>
