@@ -125,7 +125,7 @@ function test_without {
 
 function test_with_and_without {
   (cd $TMP_DIR && $PARENTDIR/repack --outdir $TMP_DIR --oldfile $OLDFILE --newname $NEWNAME --newextension $EXT --with disabled --without enabled)
-clear
+
   contents_identical $TMP_DIR/$OLDFILE $TMP_DIR/$NEWFILE
   check_result 0 "$test : contents should differ"
 
