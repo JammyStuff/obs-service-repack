@@ -13,15 +13,17 @@ EXT="livebuild"
 OLDFILE="$OLDNAME.$EXT"
 NEWFILE="$NEWNAME.$EXT"
 
-TESTS=(test_basic test_with test_without test_with_and_without)
+TESTS=(test_basic test_with test_without test_with_and_without test_variant test_variantid test_variant_and_variantid)
 
 FAILED=()
 
 function setup {
   TMP_DIR=$(mktemp -d)
   mkdir -p $TMP_DIR/$OLDNAME/config/package-lists
+  mkdir -p $TMP_DIR/$OLDNAME/auto
   echo test-package > $TMP_DIR/$OLDNAME/config/package-lists/enabled.list.chroot
   echo test-package > $TMP_DIR/$OLDNAME/config/package-lists/disabled
+  echo some-livebuild-config > $TMP_DIR/$OLDNAME/auto/config
   touch $TMP_DIR/$OLDNAME/{a..c}
   tar -C $TMP_DIR -cf $TMP_DIR/$OLDFILE $OLDNAME
 }
@@ -35,6 +37,28 @@ function contents_identical {
   SHA1_new=$(tar -xvf $2 | sed -e "s/$NEWNAME/lb-cfg/g" | sha1sum)
 
   if [ "$SHA1_old" = "$SHA1_new" ];  then
+    RESULT=1
+  else
+    RESULT=0
+  fi
+}
+
+function contents_config_identical {
+  old_file=$(tar -xvf $1 -O $OLDNAME/auto/config)
+  new_file=$(tar -xvf $2 -O $NEWNAME/auto/config)
+
+  if [ "$old_file" == "$new_file" ]; then
+    RESULT=1
+  else
+    RESULT=0
+  fi
+}
+
+function verify_config_state {
+  new_file=$(tar -xvf $TMP_DIR/$NEWFILE -O $NEWNAME/auto/config)
+  contains_field=$(echo $new_file | grep "$1\=\"$2\"")
+
+  if [ -n "$contains_field" ]; then
     RESULT=1
   else
     RESULT=0
@@ -101,7 +125,6 @@ function test_without {
 
 function test_with_and_without {
   (cd $TMP_DIR && $PARENTDIR/repack --outdir $TMP_DIR --oldfile $OLDFILE --newname $NEWNAME --newextension $EXT --with disabled --without enabled)
-clear
 
   contents_identical $TMP_DIR/$OLDFILE $TMP_DIR/$NEWFILE
   check_result 0 "$test : contents should differ"
@@ -111,6 +134,39 @@ clear
 
   verify_package_list_state 0 enabled
   check_result 1 "$test : package list (enabled) should be disabled"
+}
+
+function test_variant {
+  (cd $TMP_DIR && $PARENTDIR/repack --outdir $TMP_DIR --oldfile $OLDFILE --newname $NEWNAME --newextension $EXT --variant VARIANT-NAME)
+
+  contents_config_identical $TMP_DIR/$OLDFILE $TMP_DIR/$NEWFILE
+  check_result 0 "$test : contents should differ"
+
+  verify_config_state VARIANT VARIANT-NAME
+  check_result 1 "$test : VARIANT=VARIANT-NAME should be present"
+}
+
+function test_variantid {
+  (cd $TMP_DIR && $PARENTDIR/repack --outdir $TMP_DIR --oldfile $OLDFILE --newname $NEWNAME --newextension $EXT --variantid VARIANT_ID-NAME)
+
+  contents_config_identical $TMP_DIR/$OLDFILE $TMP_DIR/$NEWFILE
+  check_result 0 "$test : contents should differ"
+
+  verify_config_state VARIANT_ID VARIANT_ID-NAME
+  check_result 1 "$test : VARIANTID=VARIANTID-NAME should be present"
+}
+
+function test_variant_and_variantid {
+  (cd $TMP_DIR && $PARENTDIR/repack --outdir $TMP_DIR --oldfile $OLDFILE --newname $NEWNAME --newextension $EXT --variant VARIANT-NAME --variantid VARIANT_ID-NAME)
+
+  contents_config_identical $TMP_DIR/$OLDFILE $TMP_DIR/$NEWFILE
+  check_result 0 "$test : contents should differ"
+
+  verify_config_state VARIANT VARIANT-NAME
+  check_result 1 "$test : VARIANT=\"VARIANT-NAME\" should be present"
+
+  verify_config_state VARIANT_ID VARIANT_ID-NAME
+  check_result 1 "$test : VARIANT_ID=\"VARIANT_ID-NAME\" should be present"
 }
 
 function summary {

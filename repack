@@ -38,6 +38,19 @@ sub glob2pat {
     return '^' . $globstr . '$';
 }
 
+sub create_here_doc {
+    my ( $key, $value ) = @_;
+
+    my $here_doc = <<"APPEND";
+
+cat <<EOF >> config/environment.chroot_hooks
+    $key="$value"
+EOF
+APPEND
+
+    return $here_doc;
+}
+
 my %opt = ();
 
 while (@ARGV) {
@@ -66,6 +79,14 @@ while (@ARGV) {
         shift @ARGV;
         push @{$opt{without}}, shift @ARGV;
         next;
+     } elsif ($ARGV[0] eq '--variant') {
+         shift @ARGV;
+         $opt{variant} = shift @ARGV;
+         next;
+     } elsif ($ARGV[0] eq '--variantid') {
+         shift @ARGV;
+         $opt{variantid} = shift @ARGV;
+         next;
     } else {
         die("Unknown argument $ARGV[0]!");
     }
@@ -118,6 +139,21 @@ foreach my $file (@{$opt{without}}) {
 
     print STDOUT "Disabling $file_with_ext\n";
     rename($file_with_ext, substr($file_with_ext, 0, -12)); # 12 == length(".list.chroot")
+}
+
+my $config_file = "$newdir/auto/config";
+if (-e "$config_file") {
+    my $fh;
+    open($fh, '>>', $config_file) or die("Unable to open $config_file ($!)");
+
+    if (exists $opt{variant}) {
+        print $fh create_here_doc("VARIANT", $opt{variant});
+    }
+    if (exists $opt{variantid}) {
+        print $fh create_here_doc("VARIANT_ID", $opt{variantid});
+    }
+
+    close($fh);
 }
 
 system("tar -C $tmpdir -cf $opt{outdir}/$opt{newname}.$opt{newextension} $opt{newname}");
