@@ -1,0 +1,5 @@
+obs-service-repack (0.1) unstable; urgency=low
+
+  * Initial version of obs-service-repack package for developers
+
+ -- Colin Docherty <colin@doch.orguk>  Wed, 15 Jun 2016 00:00:00 +0000

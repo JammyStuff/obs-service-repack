@@ -1,0 +1,13 @@
+Source: obs-service-repack
+Priority: extra
+Section: misc
+Maintainer: Colin Docherty <colin@doch.org.uk>
+Standards-Version: 3.9.4
+Build-Depends: debhelper (>= 9)
+
+Package: obs-service-repack
+Section: misc
+Architecture: all
+Depends: ${misc:Depends}, devscripts, fakeroot
+Description: $prefix OBS repack service for developer laptops
+ This package sets up the OBS repack service on developer laptops
